@@ -1,0 +1,224 @@
+1. cancel_all_orders — Метод для отмены всех активных ордеров.
+Этот метод отменяет все активные ордера на вашем счёте.
+
+Пример использования:
+
+Редактировать
+from tinkoff.invest import Client
+
+TOKEN = "YOUR_TINKOFF_API_TOKEN"
+
+with Client(TOKEN) as client:
+    # Отменяем все активные ордера
+    cancel_response = client.orders.cancel_all_orders(account_id="your_account_id")
+    print(cancel_response)
+2. create_market_data_stream — Создание потока рыночных данных.
+Этот метод позволяет создать поток рыночных данных для конкретных инструментов. Он используется для получения данных в реальном времени, таких как котировки и другие рыночные данные.
+
+Пример использования:
+
+python
+Копировать
+Редактировать
+from tinkoff.invest import Client
+
+TOKEN = "YOUR_TINKOFF_API_TOKEN"
+
+with Client(TOKEN) as client:
+    # Создание потока рыночных данных
+    market_data_stream = client.market_data.create_market_data_stream(figis=["FIGI_1", "FIGI_2"])
+    print(market_data_stream)
+3. get_all_candles — Получение свечей (candles) для инструмента.
+Метод используется для получения данных о свечах для конкретного инструмента. Свечи могут быть получены по различным временным интервалам (например, 1 минута, 5 минут и так далее).
+
+Пример использования:
+
+python
+Копировать
+Редактировать
+from tinkoff.invest import Client
+
+TOKEN = "YOUR_TINKOFF_API_TOKEN"
+FIGI = "FIGI_INSTRUMENT"
+
+with Client(TOKEN) as client:
+    candles = client.market_data.get_all_candles(figi=FIGI, from_="2021-01-01", to="2021-12-31", interval="1min")
+    print(candles)
+4. instruments — Получение информации о финансовых инструментах.
+Метод используется для получения информации о доступных финансовых инструментах на платформе. Вы можете получить подробную информацию о любых инструментах (акции, облигации и т. д.).
+
+Пример использования:
+
+python
+Копировать
+Редактировать
+from tinkoff.invest import Client
+
+TOKEN = "YOUR_TINKOFF_API_TOKEN"
+
+with Client(TOKEN) as client:
+    # Получаем список всех доступных инструментов
+    instruments = client.instruments.get_instruments()
+    print(instruments)
+5. market_data — Получение рыночных данных.
+Этот сервис предоставляет методы для получения различных типов рыночных данных (например, котировок, исторических данных и т. д.).
+
+Пример использования:
+
+python
+Копировать
+Редактировать
+from tinkoff.invest import Client
+
+TOKEN = "YOUR_TINKOFF_API_TOKEN"
+FIGI = "FIGI_INSTRUMENT"
+
+with Client(TOKEN) as client:
+    # Получаем текущие котировки для инструмента
+    quote = client.market_data.get_market_data(figi=FIGI)
+    print(quote)
+6. market_data_stream — Поток рыночных данных.
+Этот сервис позволяет создать поток рыночных данных для одного или нескольких инструментов. Поток данных позволяет получать обновления в реальном времени.
+
+Пример использования:
+
+python
+Копировать
+Редактировать
+from tinkoff.invest import Client
+
+TOKEN = "YOUR_TINKOFF_API_TOKEN"
+
+with Client(TOKEN) as client:
+    # Создание потока рыночных данных для нескольких инструментов
+    market_data_stream = client.market_data_stream.create_market_data_stream(figis=["FIGI_1", "FIGI_2"])
+    print(market_data_stream)
+7. operations — Получение операций на счёте.
+Этот сервис позволяет получить информацию об операциях на вашем счёте. Вы можете получить операции за конкретный период или по определённым фильтрам.
+
+Пример использования:
+
+python
+Копировать
+Редактировать
+from tinkoff.invest import Client
+
+TOKEN = "YOUR_TINKOFF_API_TOKEN"
+ACCOUNT_ID = "YOUR_ACCOUNT_ID"
+
+with Client(TOKEN) as client:
+    # Получаем список операций на счёте
+    operations = client.operations.get_operations(account_id=ACCOUNT_ID, from_="2021-01-01", to="2021-12-31")
+    print(operations)
+8. operations_stream — Поток операций.
+Этот метод позволяет отслеживать операции на счёте в реальном времени. Он полезен для того, чтобы получать уведомления о новых операциях.
+
+Пример использования:
+
+python
+Копировать
+Редактировать
+from tinkoff.invest import Client
+
+TOKEN = "YOUR_TINKOFF_API_TOKEN"
+
+with Client(TOKEN) as client:
+    # Создание потока операций для отслеживания изменений в реальном времени
+    operations_stream = client.operations_stream.create_operations_stream(account_id="your_account_id")
+    print(operations_stream)
+9. orders — Создание ордера.
+Метод позволяет создать ордер (например, на покупку или продажу инструмента) на вашем счёте.
+
+Пример использования:
+
+python
+Копировать
+Редактировать
+from tinkoff.invest import Client
+
+TOKEN = "YOUR_TINKOFF_API_TOKEN"
+
+with Client(TOKEN) as client:
+    # Создание рыночного ордера
+    order = client.orders.post_order(account_id="your_account_id", figi="FIGI_INSTRUMENT", quantity=10, price=100)
+    print(order)
+10. orders_stream — Поток ордеров.
+Метод позволяет получать обновления о новых ордерах или изменениях состояния ордеров на счёте в реальном времени.
+
+Пример использования:
+
+python
+Копировать
+Редактировать
+from tinkoff.invest import Client
+
+TOKEN = "YOUR_TINKOFF_API_TOKEN"
+
+with Client(TOKEN) as client:
+    # Поток ордеров для отслеживания их изменений
+    orders_stream = client.orders_stream.create_orders_stream(account_id="your_account_id")
+    print(orders_stream)
+11. sandbox — Работа в песочнице (тестовый режим).
+Этот сервис позволяет работать с тестовыми данными, не совершая реальных сделок. Вы можете использовать его для проверки алгоритмов и торговли без риска.
+
+Пример использования:
+
+python
+Копировать
+Редактировать
+from tinkoff.invest import Client
+
+TOKEN = "YOUR_TINKOFF_API_TOKEN"
+
+with Client(TOKEN) as client:
+    # Получаем информацию о текущем балансе в песочнице
+    sandbox_balance = client.sandbox.get_balance()
+    print(sandbox_balance)
+12. signals — Получение торговых сигналов.
+Этот сервис предоставляет методы для получения торговых сигналов. Сигналы могут быть полезны для создания торговых стратегий.
+
+Пример использования:
+
+python
+Копировать
+Редактировать
+from tinkoff.invest import Client
+
+TOKEN = "YOUR_TINKOFF_API_TOKEN"
+
+with Client(TOKEN) as client:
+    # Получаем торговые сигналы
+    signals = client.signals.get_signals()
+    print(signals)
+13. stop_orders — Остановить ордер.
+Этот метод используется для остановки (отмены) существующих ордеров, например, для блокировки исполнения.
+
+Пример использования:
+
+python
+Копировать
+Редактировать
+from tinkoff.invest import Client
+
+TOKEN = "YOUR_TINKOFF_API_TOKEN"
+
+with Client(TOKEN) as client:
+    # Отмена существующего ордера
+    stop_order = client.stop_orders.cancel_stop_order(account_id="your_account_id", order_id="order_id")
+    print(stop_order)
+14. users — Получение информации о пользователе.
+Сервис предоставляет методы для получения информации о пользователе, его аккаунтах и данных.
+
+Пример использования:
+
+python
+Копировать
+Редактировать
+from tinkoff.invest import Client
+
+TOKEN = "YOUR_TINKOFF_API_TOKEN"
+
+with Client(TOKEN) as client:
+    # Получаем информацию о пользователе
+    user_info = client.users.get_user_info()
+    print(user_info)
