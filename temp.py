@@ -151,3 +151,4 @@ def rebalance():
 if __name__ == "__main__":
     print("⏳ Ожидание расписания...")
     rebalance()
+    print('')
