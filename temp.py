@@ -1,154 +1,118 @@
 import os
 from dotenv import load_dotenv
-from tinkoff.invest import Client, InstrumentIdType, OrderDirection, OrderType, MoneyValue
+from tinkoff.invest import (
+    Client, InstrumentIdType, OrderDirection, OrderType, Quotation
+)
 from decimal import Decimal, ROUND_DOWN
-
-import time
 load_dotenv()
 TOKEN_TIN = os.getenv("STRIPE_API_KEY")
-
-
 TOKEN = TOKEN_TIN
 
 ISIN_STOCKS = "RU000A101X76"   # ISIN БПИФа на акции
 ISIN_BONDS  = "RU000A1039N1"   # ISIN БПИФа на облигации
 
 
+def money_value_to_decimal(q: Quotation) -> Decimal:
+    return Decimal(q.units) + Decimal(q.nano) / Decimal("1e9")
 
+# 🔍 Получаем FIGI по ISIN
+def get_figi(client, isin: str) -> str:
+    instruments = client.instruments.find_instrument(query=isin).instruments
+    for instr in instruments:
+        if instr.isin == isin:
+            return instr.figi
+    raise Exception(f"❌ FIGI по ISIN {isin} не найден")
 
-# Функция: MoneyValue в Decimal
-def money_value_to_decimal(value: MoneyValue) -> Decimal:
-    return Decimal(value.units) + Decimal(value.nano) / Decimal("1e9")
+# 💵 Получаем цену по FIGI
+def get_market_price(client, figi: str) -> Decimal:
+    prices = client.market_data.get_last_prices(figi=[figi]).last_prices
+    for p in prices:
+        if p.figi == figi:
+            return money_value_to_decimal(p.price)
+    raise ValueError(f"❌ Не удалось получить цену для FIGI {figi}")
 
-# Получение account_id пользователя
-def get_account_id(client):
-    accounts = client.users.get_accounts()
-    return accounts.accounts[0].id
+# 📊 Получаем первый брокерский счёт (не ИИС)
+def get_account_id(client) -> str:
+    accounts = client.users.get_accounts().accounts
+    for acc in accounts:
+        if acc.access_level.name == "ACCOUNT_ACCESS_LEVEL_FULL_ACCESS":
+            return acc.id
+    raise Exception("❌ Нет подходящего брокерского счёта")
 
-# Поиск FIGI по ISIN
-def get_figi(client, isin):
-    instrument = client.instruments.find_instrument(query=isin)
-    for item in instrument.instruments:
-        if item.isin == isin:
-            return item.figi
-    raise Exception(f"FIGI по ISIN {isin} не найден.")
-
-# Получение ISIN по FIGI (для отображения и сопоставления)
-def get_isin_by_figi(client, figi):
-    instrument = client.instruments.get_instrument_by(id_type=InstrumentIdType.INSTRUMENT_ID_TYPE_FIGI, id=figi)
-    return instrument.instrument.isin
-
-# Получение портфеля
+# 📦 Получаем портфель
 def get_portfolio(client, account_id):
     return client.operations.get_portfolio(account_id=account_id)
 
-# Цена по рынку
-def get_market_price(client, figi):
-    book = client.market_data.get_order_book(figi=figi, depth=1)
-    return money_value_to_decimal(book.last_price)
-
-# Отправка ордера
-def place_order(client, account_id, figi, direction, quantity):
-    order = client.orders.post_order(
-        order_id="rebalance_" + figi,
-        figi=figi,
-        account_id=account_id,
-        quantity=quantity,
-        direction=direction,
-        order_type=OrderType.ORDER_TYPE_MARKET
-    )
-    print(f"  ✅ {direction.name.title()} {quantity} лотов {figi}")
-
-# Печать всех позиций
+# 📋 Печатаем все позиции
 def print_all_positions(client, portfolio):
     print("\n📋 Все позиции в портфеле:")
-    for p in portfolio.positions:
-        price = money_value_to_decimal(p.current_price)
-        isin = get_isin_by_figi(client, p.figi)
-        print(f"FIGI: {p.figi} | ISIN: {isin} | Qty: {p.quantity.units} | Price: {price:.2f}")
+    for pos in portfolio.positions:
+        try:
+            instr = client.instruments.get_instrument_by(
+                id_type=InstrumentIdType.INSTRUMENT_ID_TYPE_FIGI,
+                id=pos.figi
+            ).instrument
+            isin = instr.isin
+        except:
+            isin = ""
+        price = get_market_price(client, pos.figi)
+        print(f"FIGI: {pos.figi} | ISIN: {isin} | Qty: {pos.quantity.units} | Price: {price:.2f}")
 
-# Ребалансировка
+# 🛒 Совершаем ордер
+def place_order(client, account_id, figi, quantity: int, direction: OrderDirection):
+    if quantity < 1:
+        print("ℹ️ Кол-во лотов меньше 1 — пропуск.")
+        return
+    client.orders.post_order(
+        figi=figi,
+        quantity=quantity,
+        direction=direction,
+        account_id=account_id,
+        order_type=OrderType.ORDER_TYPE_MARKET,
+        order_id="",  # UUID сгенерируется автоматически
+    )
+    print(f"✅ Order_{direction.name.title()} {quantity} лотов по FIGI {figi}")
+
+# 🔄 Главная логика ребалансировки
 def rebalance():
     with Client(TOKEN) as client:
-        print("🔄 Запуск ребалансировки")
+        print("\n🔄 Запуск ребалансировки")
         account_id = get_account_id(client)
-        figi_stocks = get_figi(client, ISIN_STOCKS)
-        figi_bonds = get_figi(client, ISIN_BONDS)
-
         portfolio = get_portfolio(client, account_id)
         print_all_positions(client, portfolio)
 
-        total = money_value_to_decimal(portfolio.total_amount_portfolio)
+        # Получаем FIGI по ISIN
+        figi_stocks = get_figi(client, ISIN_STOCKS)
+        figi_bonds = get_figi(client, ISIN_BONDS)
 
-        stocks_value = Decimal(0)
-        bonds_value = Decimal(0)
-
+        # Считаем стоимости позиций
+        total_stocks = Decimal("0")
+        total_bonds = Decimal("0")
         for p in portfolio.positions:
-            value = money_value_to_decimal(p.current_price) * Decimal(p.quantity.units)
-            isin = get_isin_by_figi(client, p.figi)
-            if isin == ISIN_STOCKS:
-                stocks_value += value
-            elif isin == ISIN_BONDS:
-                bonds_value += value
+            price = get_market_price(client, p.figi)
+            value = Decimal(p.quantity.units) * price
+            if p.figi == figi_stocks:
+                total_stocks += value
+            elif p.figi == figi_bonds:
+                total_bonds += value
 
-        print(f"\n📊 Портфель: Акции = {stocks_value:.2f}₽ | Облигации = {bonds_value:.2f}₽ | Всего = {total:.2f}₽")
+        total = total_stocks + total_bonds
+        print(f"\n📊 Портфель: Акции = {total_stocks:.2f}₽ | Облигации = {total_bonds:.2f}₽ | Всего = {total:.2f}₽")
 
-        target = total / 2
-        diff_stocks = target - stocks_value
-        diff_bonds  = target - bonds_value
-        print(diff_stocks)
-        print(diff_bonds)
-
-        if abs(diff_stocks) < Decimal(target/20):
-            print("⚖️ Ребалансировка не требуется.")
+        # Расчёт отклонения и направления
+        diff = (total / 2) - total_stocks
+        if abs(diff) < 100:
+            print("⚖️ Отклонение < 100₽ — ребаланс не требуется.")
             return
-        if diff_stocks > diff_bonds:
-            if diff_bonds > 0:
-                bond_price = get_market_price(client, figi_bonds)
-                qty = (diff_bonds / bond_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
-                if qty > 0:
-                    place_order(client, account_id, figi_bonds, OrderDirection.ORDER_DIRECTION_BUY, int(qty))
-            else:
-                bond_price = get_market_price(client, figi_bonds)
-                qty = (-diff_bonds / bond_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
-                if qty > 0:
-                    place_order(client, account_id, figi_bonds, OrderDirection.ORDER_DIRECTION_SELL, int(qty))
 
+        # direction = OrderDirection.ORDER_DIRECTION_BUY if diff > 0 else OrderDirection.ORDER_DIRECTION_SELL
+        #
+        # # Получаем цену и количество лотов
+        # stock_price = get_market_price(client, figi_stocks)
+        # qty = (abs(diff) / stock_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
+        #
+        # place_order(client, account_id, figi_stocks, int(qty), direction)
 
-            if diff_stocks > 0:
-                stock_price = get_market_price(client, figi_stocks)
-                qty = (diff_stocks / stock_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
-                if qty > 0:
-                    place_order(client, account_id, figi_stocks, OrderDirection.ORDER_DIRECTION_BUY, int(qty))
-            else:
-                stock_price = get_market_price(client, figi_stocks)
-                qty = (-diff_stocks / stock_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
-                if qty > 0:
-                    place_order(client, account_id, figi_stocks, OrderDirection.ORDER_DIRECTION_SELL, int(qty))
-        else:
-            if diff_stocks > 0:
-                stock_price = get_market_price(client, figi_stocks)
-                qty = (diff_stocks / stock_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
-                if qty > 0:
-                    place_order(client, account_id, figi_stocks, OrderDirection.ORDER_DIRECTION_BUY, int(qty))
-            else:
-                stock_price = get_market_price(client, figi_stocks)
-                qty = (-diff_stocks / stock_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
-                if qty > 0:
-                    place_order(client, account_id, figi_stocks, OrderDirection.ORDER_DIRECTION_SELL, int(qty))
-            if diff_bonds > 0:
-                bond_price = get_market_price(client, figi_bonds)
-                qty = (diff_bonds / bond_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
-                if qty > 0:
-                    place_order(client, account_id, figi_bonds, OrderDirection.ORDER_DIRECTION_BUY, int(qty))
-            else:
-                bond_price = get_market_price(client, figi_bonds)
-                qty = (-diff_bonds / bond_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
-                if qty > 0:
-                    place_order(client, account_id, figi_bonds, OrderDirection.ORDER_DIRECTION_SELL, int(qty))
-
-
+# 🚀 Старт
 if __name__ == "__main__":
-    print("⏳ Ожидание расписания...")
     rebalance()
-    print('')
