@@ -18,8 +18,12 @@ def money_value_to_decimal(q: Quotation) -> Decimal:
 # 🔍 Получаем FIGI по ISIN
 def get_figi(client, isin: str) -> str:
     instruments = client.instruments.find_instrument(query=isin).instruments
+    print(f"🔍 Инструменты для ISIN {isin}:")
+    for instr in instruments:
+        print(f"  FIGI={instr.figi} | ISIN={instr.isin} | Ticker={instr.ticker} | Name={instr.name}")
     for instr in instruments:
         if instr.isin == isin:
+            print(f"✅ Найден FIGI для ISIN {isin}: {instr.figi}")
             return instr.figi
     raise Exception(f"❌ FIGI по ISIN {isin} не найден")
 
@@ -56,7 +60,7 @@ def print_all_positions(client, portfolio):
         except:
             isin = ""
         price = get_market_price(client, pos.figi)
-        print(f"FIGI: {pos.figi} | ISIN: {isin} | Qty: {pos.quantity.units} | Price: {price:.2f}")
+        print(f"FIGI: {pos.figi} | ISIN: {isin} | Количество: {pos.quantity.units} | Price: {price:.2f}")
 
 # 🛒 Совершаем ордер
 def place_order(client, account_id, figi, quantity: int, direction: OrderDirection):
@@ -80,38 +84,89 @@ def rebalance():
         account_id = get_account_id(client)
         portfolio = get_portfolio(client, account_id)
         print_all_positions(client, portfolio)
+        total = money_value_to_decimal(portfolio.total_amount_portfolio)
 
         # Получаем FIGI по ISIN
-        figi_stocks = get_figi(client, ISIN_STOCKS)
+        # Получаем FIGI по ISIN для облигаций (берём первый, там один вариант)
         figi_bonds = get_figi(client, ISIN_BONDS)
+
+        # Для акций жёстко задаём FIGI из портфеля, чтобы избежать ошибки выбора
+        figi_stocks = "TCS60A101X76"
+        print(f"DEBUG: Используем вручную FIGI акций: {figi_stocks}")
+        print(f"DEBUG: Полученный FIGI облигаций: {figi_bonds}")
 
         # Считаем стоимости позиций
         total_stocks = Decimal("0")
         total_bonds = Decimal("0")
+
         for p in portfolio.positions:
             price = get_market_price(client, p.figi)
-            value = Decimal(p.quantity.units) * price
-            if p.figi == figi_stocks:
+            qty = int(p.quantity.units)  # приводим к int
+            value = Decimal(qty) * price
+
+            print(f"DEBUG: FIGI={p.figi} | price={price} | qty={qty} | value={value}")
+
+            if p.figi.upper() == figi_stocks.upper():
                 total_stocks += value
-            elif p.figi == figi_bonds:
+            elif p.figi.upper() == figi_bonds.upper():
                 total_bonds += value
 
-        total = total_stocks + total_bonds
-        print(f"\n📊 Портфель: Акции = {total_stocks:.2f}₽ | Облигации = {total_bonds:.2f}₽ | Всего = {total:.2f}₽")
-
+        target = total / 2
+        diff_stocks = target - total_stocks
+        diff_bonds = target - total_bonds
+        print(diff_stocks)
+        print(diff_bonds)
         # Расчёт отклонения и направления
         diff = (total / 2) - total_stocks
         if abs(diff) < 100:
             print("⚖️ Отклонение < 100₽ — ребаланс не требуется.")
             return
 
-        # direction = OrderDirection.ORDER_DIRECTION_BUY if diff > 0 else OrderDirection.ORDER_DIRECTION_SELL
-        #
-        # # Получаем цену и количество лотов
-        # stock_price = get_market_price(client, figi_stocks)
-        # qty = (abs(diff) / stock_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
-        #
-        # place_order(client, account_id, figi_stocks, int(qty), direction)
+
+        if diff_stocks > diff_bonds:
+            if diff_bonds > 0:
+                bond_price = get_market_price(client, figi_bonds)
+                qty = (diff_bonds / bond_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
+                if qty > 0:
+                    place_order(client, account_id, figi_bonds, OrderDirection.ORDER_DIRECTION_BUY, int(qty))
+            else:
+                bond_price = get_market_price(client, figi_bonds)
+                qty = (-diff_bonds / bond_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
+                if qty > 0:
+                    place_order(client, account_id, figi_bonds, OrderDirection.ORDER_DIRECTION_SELL, int(qty))
+
+
+            if diff_stocks > 0:
+                stock_price = get_market_price(client, figi_stocks)
+                qty = (diff_stocks / stock_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
+                if qty > 0:
+                    place_order(client, account_id, figi_stocks, OrderDirection.ORDER_DIRECTION_BUY, int(qty))
+            else:
+                stock_price = get_market_price(client, figi_stocks)
+                qty = (-diff_stocks / stock_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
+                if qty > 0:
+                    place_order(client, account_id, figi_stocks, OrderDirection.ORDER_DIRECTION_SELL, int(qty))
+        else:
+            if diff_stocks > 0:
+                stock_price = get_market_price(client, figi_stocks)
+                qty = (diff_stocks / stock_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
+                if qty > 0:
+                    place_order(client, account_id, figi_stocks, OrderDirection.ORDER_DIRECTION_BUY, int(qty))
+            else:
+                stock_price = get_market_price(client, figi_stocks)
+                qty = (-diff_stocks / stock_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
+                if qty > 0:
+                    place_order(client, account_id, figi_stocks, OrderDirection.ORDER_DIRECTION_SELL, int(qty))
+            if diff_bonds > 0:
+                bond_price = get_market_price(client, figi_bonds)
+                qty = (diff_bonds / bond_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
+                if qty > 0:
+                    place_order(client, account_id, figi_bonds, OrderDirection.ORDER_DIRECTION_BUY, int(qty))
+            else:
+                bond_price = get_market_price(client, figi_bonds)
+                qty = (-diff_bonds / bond_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
+                if qty > 0:
+                    place_order(client, account_id, figi_bonds, OrderDirection.ORDER_DIRECTION_SELL, int(qty))
 
 # 🚀 Старт
 if __name__ == "__main__":
