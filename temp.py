@@ -128,45 +128,45 @@ def rebalance():
                 bond_price = get_market_price(client, figi_bonds)
                 qty = (diff_bonds / bond_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
                 if qty > 0:
-                    place_order(client, account_id, figi_bonds, OrderDirection.ORDER_DIRECTION_BUY, int(qty))
+                    place_order(client, account_id, figi_bonds,  int(qty), OrderDirection.ORDER_DIRECTION_BUY)
             else:
                 bond_price = get_market_price(client, figi_bonds)
                 qty = (-diff_bonds / bond_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
                 if qty > 0:
-                    place_order(client, account_id, figi_bonds, OrderDirection.ORDER_DIRECTION_SELL, int(qty))
+                    place_order(client, account_id, figi_bonds, int(qty), OrderDirection.ORDER_DIRECTION_SELL, )
 
 
             if diff_stocks > 0:
                 stock_price = get_market_price(client, figi_stocks)
                 qty = (diff_stocks / stock_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
                 if qty > 0:
-                    place_order(client, account_id, figi_stocks, OrderDirection.ORDER_DIRECTION_BUY, int(qty))
+                    place_order(client, account_id, figi_stocks, int(qty), OrderDirection.ORDER_DIRECTION_BUY, )
             else:
                 stock_price = get_market_price(client, figi_stocks)
                 qty = (-diff_stocks / stock_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
                 if qty > 0:
-                    place_order(client, account_id, figi_stocks, OrderDirection.ORDER_DIRECTION_SELL, int(qty))
+                    place_order(client, account_id, figi_stocks,int(qty),  OrderDirection.ORDER_DIRECTION_SELL)
         else:
             if diff_stocks > 0:
                 stock_price = get_market_price(client, figi_stocks)
                 qty = (diff_stocks / stock_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
                 if qty > 0:
-                    place_order(client, account_id, figi_stocks, OrderDirection.ORDER_DIRECTION_BUY, int(qty))
+                    place_order(client, account_id, figi_stocks,int(qty), OrderDirection.ORDER_DIRECTION_BUY)
             else:
                 stock_price = get_market_price(client, figi_stocks)
                 qty = (-diff_stocks / stock_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
                 if qty > 0:
-                    place_order(client, account_id, figi_stocks, OrderDirection.ORDER_DIRECTION_SELL, int(qty))
+                    place_order(client, account_id, figi_stocks, int(qty), OrderDirection.ORDER_DIRECTION_SELL)
             if diff_bonds > 0:
                 bond_price = get_market_price(client, figi_bonds)
                 qty = (diff_bonds / bond_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
                 if qty > 0:
-                    place_order(client, account_id, figi_bonds, OrderDirection.ORDER_DIRECTION_BUY, int(qty))
+                    place_order(client, account_id, figi_bonds,int(qty),  OrderDirection.ORDER_DIRECTION_BUY)
             else:
                 bond_price = get_market_price(client, figi_bonds)
                 qty = (-diff_bonds / bond_price).quantize(Decimal("1"), rounding=ROUND_DOWN)
                 if qty > 0:
-                    place_order(client, account_id, figi_bonds, OrderDirection.ORDER_DIRECTION_SELL, int(qty))
+                    place_order(client, account_id, figi_bonds,int(qty), OrderDirection.ORDER_DIRECTION_SELL)
 
 # 🚀 Старт
 if __name__ == "__main__":
